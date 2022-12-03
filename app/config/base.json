@@ -1,0 +1,13 @@
+{
+    "name": "elmer_example",
+    "portLocal": 45001,
+    "secure": false,
+    "forceRegister": true,
+
+    "net": "api",
+    "hostname": "dev",
+    "dockerBaseName": "elmer_example",
+    "port": 3000,
+    "dns1": "1.1.1.1",
+    "dns2": "1.0.0.1"
+}
