@@ -18,10 +18,10 @@ module.exports = function($app, $router /*, $baseRouter */) {
 
 
     //# curl -X POST http://localhost:3000/example2/byfile -H 'Content-Type: application/json' -d "$(cat /file/path/json.ext)"
-    //# curl -X POST http://localhost:3000/example2/byfile -F "file=@/file/path/json.ext" > /file/path/output.json
+    //# curl -X POST http://localhost:3000/example2/byfile -F "upload=@/file/path/json.ext" > /file/path/output.json
     $router.post('/byfile', async (oRequest, oResponse) => {
         $app.app.services.web.multipartForm(oRequest, async function (oFormData) {
-            let a_sFileContents = JSON.parse(oFormData.files.file.getContent());
+            let oFileContents = JSON.parse(oFormData.files.upload.getContent());
 
             //..
         } /*, { readFileSync: { encoding: "utf8" } }*/);
