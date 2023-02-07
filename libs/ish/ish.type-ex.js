@@ -653,7 +653,7 @@
                         //# If the caller passed in a vMkDefaultVal, setup the .mk oInterface
                         if (arguments.length > 2) {
                             oInterface.mk = function (x, vDefaultVal) {
-                                return (fnTest(x) ?
+                                return (oInterface.is(x) ?
                                     x : (
                                         arguments.length > 1 ? vDefaultVal : vMkDefaultVal
                                     )
@@ -1406,7 +1406,32 @@
                                     );
                                 });
                             };
-                        }() //# type.str.replace
+                        }(), //# type.str.replace
+
+
+                        //#########
+                        /** Creates a Base64-encoded ASCII string from a binary string (i.e., a string in which each character in the string is treated as a byte of binary data).
+                         * @function ish.type.str.atob
+                         * @param {variant} x Value representing the binary string containing base64-encoded data.
+                         * @returns {string} Value representing the  the results of the passed value's Base64 decoded data.
+                         * @see {@link https://dirask.com/posts/Node-js-atob-btoa-functions-equivalents-1Aqb51|Node.js - atob / btoa functions equivalents}
+                         */ //#####
+                        //# https://dirask.com/posts/Node-js-atob-btoa-functions-equivalents-1Aqb51
+                        atob: function (encodedData) {
+                            return atob(encodedData);
+                        }, //# type.str.atob
+
+
+                        //#########
+                        /** Decodes a Base64-encoded ASCII string of data which has been encoded using Base64 encoding.
+                         * @function ish.type.str.btoa
+                         * @param {string} encodedData Value representing the binary string.
+                         * @returns {string} Value representing the results of the passed value's Base64 representation.
+                         * @see {@link https://dirask.com/posts/Node-js-atob-btoa-functions-equivalents-1Aqb51|Node.js - atob / btoa functions equivalents}
+                         */ //#####
+                        btoa: function (stringToEncode) {
+                            return btoa(stringToEncode);
+                        } //# type.str.btoa
                     };
                 }(), //# core.type.str
 
@@ -1814,23 +1839,57 @@
                     /** Determines the unique entries within the passed value.
                      * @function ish.type.arr.unique
                      * @param {variant[]} x Value representing the array to compare.
-                     * @param {boolean} [bCaseInsensitive=false] Value representing if the passed value is to be compared in a case-insensitive manor.
+                     * @param {object|boolean} [vOptions=false] Value representing if the passed value is to be compared in a case-insensitive manor.
+                     *      @param {boolean} [vOptions.caseInsensitive=false] Value representing if the keys are to be searched for in a case-insensitive manor.
+                     *      @param {string} [vOptions.path=""] Value representing the path to the requested property as a period-delimited string (e.g. "parent.child.array.0.key") or an array of strings.
                      * @returns {variant[]} Value representing the passed values' unique entries.
                      */ //#####
-                    unique: function (x, bCaseInsensitive) {
-                        var a_vReturnVal = [];
+                    unique: function (x, vOptions) {
+                        var s_vValues, vCurrentValue, iCurrentIndex, i, j,
+                            a_vReturnVal = [],
+                            oOptions = core.type.obj.mk(vOptions, { caseInsensitive: vOptions === true })
+                        ;
 
-                        //#
-                        bCaseInsensitive = (bCaseInsensitive === true);
-
-                        //#
+                        //# If the caller passed in a valid .arr
                         if (core.type.arr.is(x)) {
-                            a_vReturnVal = x.reduce(function (acc, v) {
-                                if (acc.indexOf(v) === -1 && (!bCaseInsensitive || acc.indexOf((v + "").toLowerCase()) === -1)) {
-                                    acc.push(v);
+                            //# If the caller passed in a .path to .resolve, setup our s_vValues
+                            if (oOptions.path) {
+                                s_vValues = [];
+
+                                //# Traverse the passed .arr, determine the vCurrentValue and iCurrentIndex as we gp
+                                for (i = 0; i < x.length; i++) {
+                                    vCurrentValue = core.resolve(x[i], oOptions.path);
+                                    iCurrentIndex = s_vValues.indexOf(vCurrentValue);
+
+                                    //# If the vCurrentValue was not found
+                                    if (iCurrentIndex === -1) {
+                                        //# If we are looking for .caseInsensitive s_vValues, traverse them resetting iCurrentIndex if a .cmp match is found
+                                        if (oOptions.caseInsensitive) { //} && core.type.str.is(vCurrentValue)) {
+                                            for (j = 0; j < s_vValues.length; j++) {
+                                                if (core.type.str.cmp(s_vValues[j], vCurrentValue)) {
+                                                    iCurrentIndex = j;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        //# If the vCurrentValue was (still) not found, .push the vCurrentValue into the arrays
+                                        if (iCurrentIndex === -1) {
+                                            s_vValues.push(vCurrentValue);
+                                            a_vReturnVal.push(x[i]);
+                                        }
+                                    }
                                 }
-                                return acc;
-                            }, []);
+                            }
+                            //# Else this is a standard .arr .reduce search for unique values
+                            else {
+                                a_vReturnVal = x.reduce(function (acc, v) {
+                                    if (acc.indexOf(v) === -1 && (!oOptions.caseInsensitive || acc.indexOf((v + "").toLowerCase()) === -1)) {
+                                        acc.push(v);
+                                    }
+                                    return acc;
+                                }, []);
+                            }
                         }
 
                         return a_vReturnVal;
@@ -2142,8 +2201,8 @@
                             /** Determines if the passed value has any circular references.
                              * @function ish.type.obj.is:cyclic
                              * @param {object|function} x Value to interrogate.
-                             * @param {boolean} bReturnReport Value indicating if an array of circular references is to be returned.
-                             * @returns {boolean} Value representing if the passed value has any circular references.
+                             * @param {boolean} [bReturnReport=false] Value indicating if an array of circular references is to be returned.
+                             * @returns {boolean|object[]} Value representing if the passed value has any circular references or an array of objects describing any circular references.
                              */ //#####
                             cyclic: function cr(x, bReturnReport) {
                                 var a_sKeys = [],
@@ -2154,6 +2213,9 @@
                                         report: []
                                     }
                                 ;
+
+                                //# Ensure the passed bReturnReport .is .bool, defaulted to false
+                                bReturnReport = core.type.bool.mk(bReturnReport, false);
 
                                 //# Setup the recursive logic to locate any circular references while kicking off the initial call
                                 (function doIsCyclic(oTarget, sKey) {
@@ -2481,6 +2543,70 @@
 
 
                         //#########
+                        /** Concat's arrays and copies properties into an object.
+                         * @function ish.type.obj.concat
+                         * @param {object|function} vTarget Value representing the target object to receive properties.
+                         * @param {object|function|object[]|function[]} vSource(s) representing the source object(s) whose arrays will be concat'ed and properties will be copied into the target.
+                         * @returns {object|function} Value representing the passed target object.
+                         */ //#####
+                        concat: function (vTarget, vSource, bConcatNonArrays) {
+                            var vCurrentSource, a_sCurrentKeys, i, j,
+                                a_vSources = core.type.arr.mk(vSource, [vSource])
+                            ;
+
+                            //# If the passed vTarget is valid
+                            if (core.type.obj.is(vTarget, { allowFn: true })) {
+                                //# Traverse the passed a_vSources, pulling the vCurrentSource and a_sCurrentKeys as we go
+                                for (i = 0; i < a_vSources.length; i++) {
+                                    vCurrentSource = a_vSources[i];
+                                    a_sCurrentKeys = core.type.obj.ownKeys(vCurrentSource);
+
+                                    //# If we were able to pull a_sCurrentKeys for the vCurrentSource, traverse them
+                                    if (core.type.arr.is(a_sCurrentKeys, true)) {
+                                        for (j = 0; j < a_sCurrentKeys.length; j++) {
+                                            //# If our vTarget already .has the a_sCurrentKeys
+                                            if (core.type.obj.has(vTarget, a_sCurrentKeys[j], false)) {
+                                                //# If vCurrentSource's a_sCurrentKeys .is .arr
+                                                if (core.type.arr.is(vCurrentSource[a_sCurrentKeys[j]], true)) {
+                                                    //# If the vTarget's a_sCurrentKeys .is .arr and it's not the same array as in vCurrentSource, concat the values
+                                                    if (core.type.arr.is(vTarget[a_sCurrentKeys[j]])) {
+                                                        if (vTarget[a_sCurrentKeys[j]] !== vCurrentSource[a_sCurrentKeys[j]]) {
+                                                            vTarget[a_sCurrentKeys[j]] = vTarget[a_sCurrentKeys[j]].concat(vCurrentSource[a_sCurrentKeys[j]]);
+                                                        }
+                                                    }
+                                                    //# Else if we are bConcatNonArrays, transform the vTarget's a_sCurrentKeys into an array including the vCurrentSource's value
+                                                    else if (bConcatNonArrays) {
+                                                        vTarget[a_sCurrentKeys[j]] = [vTarget[a_sCurrentKeys[j]]].concat(vCurrentSource[a_sCurrentKeys[j]]);
+                                                    }
+                                                }
+                                                //# Else if we are bConcatNonArrays
+                                                else if (bConcatNonArrays) {
+                                                    //# If the vTarget's a_sCurrentKeys .is .arr, push the vCurrentSource's value in
+                                                    if (core.type.arr.is(vTarget[a_sCurrentKeys[j]])) {
+                                                        vTarget[a_sCurrentKeys[j]].push(vCurrentSource[a_sCurrentKeys[j]]);
+                                                    }
+                                                    //# Else transform the vTarget's a_sCurrentKeys into an array including the vCurrentSource's value
+                                                    else {
+                                                        vTarget[a_sCurrentKeys[j]] = [
+                                                            vTarget[a_sCurrentKeys[j]],
+                                                            vCurrentSource[a_sCurrentKeys[j]]
+                                                        ];
+                                                    }
+                                                }
+                                            }
+                                            //# Else this a_sCurrentKeys is new for our vTarget, so set it from the vCurrentSource
+                                            else {
+                                                vTarget[a_sCurrentKeys[j]] = vCurrentSource[a_sCurrentKeys[j]];
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            return vTarget;
+                        },
+
+                        //#########
                         /** Joins the passed value into a string.
                          * @function ish.type.obj.join
                          * @param {object|function} x Value representing the object to join.
@@ -2555,7 +2681,7 @@
                         has: function (x, vKeys, bKeysArePaths) {
                             var i,
                                 a_sKeys = (core.type.arr.is(vKeys) ? vKeys : [vKeys]),
-                                bReturnVal = core.type.fn.is(x, { allowFn: true })
+                                bReturnVal = core.type.obj.is(x, { allowFn: true })
                             ;
 
                             //# If x is valid
@@ -2921,8 +3047,10 @@
         module.exports = function (core) {
             init(
                 core,
-                x => Buffer.from(x, 'base64').toString(),
-                x => Buffer.from(x).toString('base64')
+                //x => Buffer.from(x, 'base64').toString(),
+                function (x) { return Buffer.from(x, 'base64').toString('binary'); },
+                //x => Buffer.from(x).toString('base64')
+                function (x) { return Buffer.from(x, 'binary').toString('base64'); }
             );
         };
     }
